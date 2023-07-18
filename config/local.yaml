@@ -1,7 +1,0 @@
-env: "local";
-storage_path: "./storage/base.db"
-http_server:
-  address: "localhost:3000"
-  timeout: 10s
-  iddle_timeout: 60s
- 
