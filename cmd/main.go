@@ -1,16 +1,24 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
+	"log"
+
+	"github.com/roGal1k/golang-beginner/api"
+	db "github.com/roGal1k/golang-beginner/internal/database"
 )
 
 func main() {
-    http.HandleFunc("/", helloHandler)
-    log.Fatal(http.ListenAndServe(":8080", nil))
-}
+	// Создание экземпляра базы данных
+	database, err := db.NewDatabase()
+	if err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintln(w, "Hello, World!")
+	// Создание экземпляра API с передачей базы данных
+	api := &api.API{
+		DB: database,
+	}
+
+	// Запуск сервера
+	api.RunServer()
 }
