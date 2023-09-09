@@ -6,6 +6,8 @@ import (
 	"log"
 
 	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/roGal1k/golang-beginner/assets/model"
 
@@ -34,19 +36,6 @@ func NewDatabase() (*Database, error) {
 	return &Database{
 		Conn: db,
 	}, nil
-}
-
-func (d *Database) SaveMessage(message *model.Message) error {
-	// Подготовка SQL-запроса для вставки данных
-	query := "INSERT INTO messages (text) VALUES ($1)"
-	_, err := d.Conn.Exec(query, message.Text)
-	if err != nil {
-		return err
-	}
-
-	log.Println("Message saved successfully")
-
-	return nil
 }
 
 func (d *Database) SaveUser(user *model.User) error {
@@ -90,5 +79,32 @@ func (d *Database) RegisterUser(user *model.User) error {
 
 	log.Println("User registered successfully")
 
+	return nil
+}
+
+// Инициализация и настройка соединения с базой данных
+func InitDB() (*gorm.DB, error) {
+	// Замените эти параметры на соответствующие настройки вашей базы данных
+	dsn := "host=localhost user=admin password=admin dbname=mydatabase sslmode=disable"
+
+	// Создание соединения с базой данных
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func AutoMigrate(db *gorm.DB) error {
+	err := db.AutoMigrate(
+		&model.User{},
+		&model.Project{},
+		&model.Section{},
+		&model.Content{},
+	)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -1,26 +1,52 @@
-// Модуль api
 package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	"github.com/roGal1k/golang-beginner/assets/model"
-	db "github.com/roGal1k/golang-beginner/internal/database"
 )
 
 type API struct {
-	DB *db.Database
+	DB *gorm.DB
 }
 
 type Claims struct {
 	Username string `json:"username"`
 	jwt.StandardClaims
+}
+
+// Функция для верификации токена и получения информации о пользователе
+func (a *API) authorization(r *http.Request) (*Claims, error) {
+	// Извлекаем токен из запроса
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		return nil, fmt.Errorf("authorization token required")
+	}
+
+	// Верификация токена
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte("your-secret-key"), nil // Замените "your-secret-key" на ваш секретный ключ
+	})
+	if err != nil {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	// Проверка валидности токена и извлечение информации о пользователе
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	return claims, nil
 }
 
 func (a *API) registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,11 +72,28 @@ func (a *API) registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	expirationTime := time.Now().Add(31 * 24 * time.Hour) // Срок действия токена - 31 день
+	claims := &Claims{
+		Username: user.Username,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expirationTime.Unix(),
+		},
+	}
+	fmt.Print(claims.Id)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte("your-secret-key")) // Замените "your-secret-key" на ваш секретный ключ
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
 	// Сохранение пользователя в базе данных
-	err = a.DB.SaveUser(&model.User{
+	err = a.DB.Create(&model.User{
 		Username: user.Username,
 		Password: string(hashedPassword),
-	})
+		Token:    signedToken,
+	}).Error
 	if err != nil {
 		http.Error(w, "Failed to save user", http.StatusInternalServerError)
 		return
@@ -76,10 +119,16 @@ func (a *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получение пользователя из базы данных
-	storedUser, err := a.DB.GetUserByUsername(user.Username)
-	if err != nil {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
+	var storedUser model.User
+	result := a.DB.Where("username = ?", user.Username).First(&storedUser)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			http.Error(w, "User not found", http.StatusUnauthorized)
+			return
+		} else {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Проверка пароля
@@ -89,60 +138,18 @@ func (a *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Создание JWT-токена
-	expirationTime := time.Now().Add(24 * time.Hour) // Срок действия токена - 24 часа
-	claims := &Claims{
-		Username: user.Username,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte("secret-key")) // Замените "secret-key" на ваш секретный ключ
-	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+	// Токен уже должен быть в storedUser.Token после регистрации
+	if storedUser.Token == "" {
+		http.Error(w, "User token not found", http.StatusUnauthorized)
 		return
 	}
 
 	// Отправка токена в ответе
 	response := map[string]string{
-		"token": signedToken,
+		"token": storedUser.Token,
 	}
-	json.NewEncoder(w).Encode(response)
-}
+	fmt.Print(storedUser.ID)
 
-func (a *API) protectedHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Проверка наличия токена в заголовке Authorization
-	tokenString := r.Header.Get("Authorization")
-	if tokenString == "" {
-		http.Error(w, "Authorization token required", http.StatusUnauthorized)
-		return
-	}
-
-	// Проверка и верификация токена
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secret-key"), nil // Замените "secret-key" на ваш секретный ключ
-	})
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	// Проверка валидности токена
-	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	// Добавьте здесь вашу бизнес-логику для защищенного маршрута
-	response := map[string]string{
-		"message":  "Protected resource accessed",
-		"username": claims.Username,
-	}
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -156,36 +163,24 @@ func (a *API) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (a *API) helloHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	response := model.Message{Text: "Hello, World!"}
-	json.NewEncoder(w).Encode(response)
-}
-
-func (a *API) messageHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var request model.Message
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Сохранение сообщения в базу данных
-	err = a.DB.SaveMessage(&request)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(request)
-}
-
 func (a *API) RunServer() {
-	http.HandleFunc("/", a.helloHandler)
-	http.HandleFunc("/message", a.messageHandler)
-	http.HandleFunc("/register", a.registerHandler)
-	http.HandleFunc("/login", a.loginHandler)
-	http.HandleFunc("/protected", a.protectedHandler)
-	http.HandleFunc("/logout", a.logoutHandler)
+	// Создание маршрутизатора mux
+	r := mux.NewRouter()
+
+	// Настройка маршрутов с использованием mux
+	r.HandleFunc("/register", a.registerHandler).Methods("POST")
+	r.HandleFunc("/login", a.loginHandler).Methods("POST")
+	r.HandleFunc("/logout", a.logoutHandler).Methods("POST")
+	r.HandleFunc("/projects", a.getProjectsHandler).Methods("GET")
+	r.HandleFunc("/projects/create", a.createProjectHandler).Methods("POST")
+	r.HandleFunc("/project/{projectname}/section/create", a.createSectionHandler).Methods("POST")
+	r.HandleFunc("/project/{projectname}", a.getProjectHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/sections", a.getSectionsHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}", a.getSectionHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/update", a.updateProjectHandler).Methods("PUT")
+
+	// Используйте mux вместо http.ListenAndServe
+	http.Handle("/", r)
 
 	log.Println("Server started on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
