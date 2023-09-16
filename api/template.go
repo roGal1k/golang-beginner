@@ -12,7 +12,7 @@ import (
 )
 
 // Get projects list
-func (a *API) getProjectsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) getTemplatesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	claims, err := a.authorization(r)
@@ -42,7 +42,7 @@ func (a *API) getProjectsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create project
-func (a *API) createProjectHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) createTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	claims, err := a.authorization(r)
@@ -91,7 +91,7 @@ func (a *API) createProjectHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Geted Project
-func (a *API) getProjectHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) getTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	userId := r.Header.Get("Id")
@@ -122,7 +122,7 @@ func (a *API) getProjectHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(project)
 }
 
-func (a *API) updateProjectHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) updateTempateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Извлечение ID проекта из заголовка

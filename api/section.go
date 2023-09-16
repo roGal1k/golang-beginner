@@ -61,7 +61,7 @@ func (a *API) createSectionHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (a *API) getSectionHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) getSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Извлечение значений из URL-параметров
@@ -94,6 +94,41 @@ func (a *API) getSectionHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (a *API) getSectionsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) getSectionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Извлечение значений из URL-параметров
+	vars := mux.Vars(r)
+
+	projectName, ok := vars["projectname"]
+	if !ok {
+		http.Error(w, "Project name is required"+string(projectName), http.StatusBadRequest)
+		return
+	}
+
+	sectionName, ok := vars["sectionname"]
+	if !ok {
+		http.Error(w, "Section name is required"+string(sectionName), http.StatusBadRequest)
+		return
+	}
+
+	idSection := r.Header.Get("Id")
+	if idSection == "" {
+		http.Error(w, "id project is not found", http.StatusUnauthorized)
+		return
+	}
+
+	var Section []model.Section
+	err := a.DB.Where("section_id = ?", idSection).Find(&Section).Error
+	if err != nil {
+		http.Error(w, "Failed to fetch projects", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(Section)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (a *API) updateSectionHandler(w http.ResponseWriter, r *http.Request) {
 
 }

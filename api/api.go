@@ -166,20 +166,32 @@ func (a *API) logoutHandler(w http.ResponseWriter, r *http.Request) {
 func (a *API) RunServer() {
 	// Создание маршрутизатора mux
 	r := mux.NewRouter()
-
 	// Настройка маршрутов с использованием mux
+
 	r.HandleFunc("/register", a.registerHandler).Methods("POST")
 	r.HandleFunc("/login", a.loginHandler).Methods("POST")
 	r.HandleFunc("/logout", a.logoutHandler).Methods("POST")
-	r.HandleFunc("/projects", a.getProjectsHandler).Methods("GET")
+
 	r.HandleFunc("/projects/create", a.createProjectHandler).Methods("POST")
-	r.HandleFunc("/project/{projectname}/section/create", a.createSectionHandler).Methods("POST")
+	r.HandleFunc("/projects", a.getProjectsHandler).Methods("GET")
 	r.HandleFunc("/project/{projectname}", a.getProjectHandler).Methods("GET")
-	r.HandleFunc("/project/{projectname}/sections", a.getSectionsHandler).Methods("GET")
-	r.HandleFunc("/project/{projectname}/section/{sectionname}", a.getSectionHandler).Methods("GET")
 	r.HandleFunc("/project/{projectname}/update", a.updateProjectHandler).Methods("PUT")
 
-	// Используйте mux вместо http.ListenAndServe
+	r.HandleFunc("/project/{projectname}/section/create", a.createSectionHandler).Methods("POST")
+	r.HandleFunc("/project/{projectname}/sections", a.getSectionsHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}", a.getSectionHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}/update", a.updateSectionHandler).Methods("PUT")
+
+	r.HandleFunc("/project/{projectname}/section/{sectionname}/create", a.createContentHandler).Methods("POST")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}/content", a.getContentHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}/contents", a.getContentsHandler).Methods("GET")
+	r.HandleFunc("/project/{projectname}/section/{sectionname}/content/update", a.updateContentHandler).Methods("PUT")
+
+	r.HandleFunc("/templates/create", a.createProjectHandler).Methods("POST")
+	r.HandleFunc("/templates", a.getProjectsHandler).Methods("GET")
+	r.HandleFunc("/template/{templatename}", a.getProjectHandler).Methods("GET")
+	r.HandleFunc("/template/{templatename}/update", a.updateProjectHandler).Methods("PUT")
+
 	http.Handle("/", r)
 
 	log.Println("Server started on port 8080")
